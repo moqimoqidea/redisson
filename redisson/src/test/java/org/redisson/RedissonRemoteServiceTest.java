@@ -8,6 +8,8 @@ import org.redisson.api.*;
 import org.redisson.api.annotation.RRemoteAsync;
 import org.redisson.api.annotation.RRemoteReactive;
 import org.redisson.api.annotation.RRemoteRx;
+import nl.altindag.log.LogCaptor;
+import org.redisson.client.handler.CommandDecoder;
 import org.redisson.codec.SerializationCodec;
 import org.redisson.config.Config;
 import org.redisson.remote.RemoteServiceAckTimeoutException;
@@ -1047,6 +1049,9 @@ public class RedissonRemoteServiceTest extends RedisDockerTest {
 
     @Test
     public void testRemoteServiceInCluster() {
+        LogCaptor logCaptor = LogCaptor.forClass(CommandDecoder.class);
+        logCaptor.setLogLevelToTrace();
+
         testInCluster(redisson -> {
             RRemoteService serverService = redisson.getRemoteService("test-cluster");
             serverService.register(RemoteInterface.class, new RemoteImpl(), 5);
@@ -1065,10 +1070,16 @@ public class RedissonRemoteServiceTest extends RedisDockerTest {
 
             serverService.deregister(RemoteInterface.class);
         });
+
+        assertThat(logCaptor.getTraceLogs().stream().noneMatch(n -> n.contains("reply: -MOVED"))).isTrue();
+        logCaptor.close();
     }
 
     @Test
     public void testRemoteServiceAsyncInCluster() {
+        LogCaptor logCaptor = LogCaptor.forClass(CommandDecoder.class);
+        logCaptor.setLogLevelToTrace();
+
         testInCluster(redisson -> {
             RRemoteService serverService = redisson.getRemoteService("test-cluster-async-service");
             serverService.register(RemoteInterface.class, new RemoteImpl(), 5);
@@ -1082,10 +1093,16 @@ public class RedissonRemoteServiceTest extends RedisDockerTest {
 
             serverService.deregister(RemoteInterface.class);
         });
+
+        assertThat(logCaptor.getTraceLogs().stream().noneMatch(n -> n.contains("reply: -MOVED"))).isTrue();
+        logCaptor.close();
     }
 
     @Test
     public void testRemoteServiceCancelInCluster() throws InterruptedException {
+        LogCaptor logCaptor = LogCaptor.forClass(CommandDecoder.class);
+        logCaptor.setLogLevelToTrace();
+
         testInCluster(redisson -> {
             AtomicInteger iterations = new AtomicInteger();
             redisson.getRemoteService("test-cluster-cancel-service")
@@ -1104,10 +1121,16 @@ public class RedissonRemoteServiceTest extends RedisDockerTest {
 
             assertThat(future.cancel(true)).isTrue();
         });
+
+        assertThat(logCaptor.getTraceLogs().stream().noneMatch(n -> n.contains("reply: -MOVED"))).isTrue();
+        logCaptor.close();
     }
 
     @Test
     public void testRemoteServiceTimeoutInCluster() {
+        LogCaptor logCaptor = LogCaptor.forClass(CommandDecoder.class);
+        logCaptor.setLogLevelToTrace();
+
         testInCluster(redisson -> {
             RRemoteService serverService = redisson.getRemoteService("test-cluster-timeout-service");
             serverService.register(RemoteInterface.class, new RemoteImpl(), 1);
@@ -1121,102 +1144,8 @@ public class RedissonRemoteServiceTest extends RedisDockerTest {
 
             serverService.deregister(RemoteInterface.class);
         });
-    }
-}
-                });
-            }
-            executorService.shutdown();
-            try {
-                assertThat(executorService.awaitTermination(100, TimeUnit.SECONDS)).isTrue();
-                assertThat(successCount.get()).isEqualTo(TOTAL);
-                log.info("TestPerformance Result, duration={}, rps={}", totalTime, 1.0 * TOTAL / totalTime.get() * 1000);
-            } catch (InterruptedException e) {
-                throw new RuntimeException(e);
-            }
-=======
-    @Test
-    public void testRemoteServiceInCluster() {
-        testInCluster(redisson -> {
-            RRemoteService serverService = redisson.getRemoteService("test-cluster");
-            serverService.register(RemoteInterface.class, new RemoteImpl(), 5);
 
-            RRemoteService clientService = redisson.getRemoteService("test-cluster");
-            RemoteInterface service = clientService.get(RemoteInterface.class);
-
-            String result = service.resultMethod(21L);
-            assertThat(result).isEqualTo(42L);
-
-            service.voidMethod("cluster-test", 100L);
-
-            RemoteInterface serviceWithAck = clientService.get(RemoteInterface.class,
-                    RemoteInvocationOptions.defaults().expectAckWithin(5, TimeUnit.SECONDS));
-            assertThat(serviceWithAck.resultMethod(50L)).isEqualTo(100L);
-
-            serverService.deregister(RemoteInterface.class);
-        });
-    }
-
-    @Test
-    public void testRemoteServiceAsyncInCluster() {
-        testInCluster(redisson -> {
-            RRemoteService serverService = redisson.getRemoteService("test-cluster-async-service");
-            serverService.register(RemoteInterface.class, new RemoteImpl(), 5);
-
-            RRemoteService clientService = redisson.getRemoteService("test-cluster-async-service");
-            RemoteInterfaceAsync asyncService = clientService.get(RemoteInterfaceAsync.class);
-
-            RFuture<Long> future = asyncService.resultMethod(25L);
-            Long result = future.toCompletableFuture().join();
-            assertThat(result).isEqualTo(50L);
-
-            serverService.deregister(RemoteInterface.class);
-        });
-    }
-
-    @Test
-    public void testRemoteServiceCancelInCluster() throws InterruptedException {
-        testInCluster(redisson -> {
-            AtomicInteger iterations = new AtomicInteger();
-            RRemoteService serverService = redisson.getRemoteService("test-cluster-cancel");
-            serverService.register(RemoteInterface.class, new RemoteImpl(iterations), 1);
-
-            RRemoteService clientService = redisson.getRemoteService("test-cluster-cancel");
-            RemoteInterfaceAsync asyncService = clientService.get(RemoteInterfaceAsync.class);
-
-            RFuture<Void> future = asyncService.cancelMethod();
-            Thread.sleep(500);
-
-            assertThat(future.cancel(true)).isTrue();
-
-            boolean cancelled = false;
-            try {
-                future.get();
-            } catch (CancellationException e) {
-                cancelled = true;
-            } catch (ExecutionException e) {
-                // ignore
-            }
-            assertThat(cancelled).isTrue();
-
-            serverService.deregister(RemoteInterface.class);
-        });
-    }
-
-    @Test
-    public void testRemoteServiceTimeoutInCluster() {
-        testInCluster(redisson -> {
-            RRemoteService serverService = redisson.getRemoteService("test-cluster-timeout-service");
-            serverService.register(RemoteInterface.class, new RemoteImpl(), 1);
-
-            RRemoteService clientService = redisson.getRemoteService("test-cluster-timeout-service");
-            RemoteInterface service = clientService.get(RemoteInterface.class, 1, TimeUnit.SECONDS);
-
-            Assertions.assertThrows(RemoteServiceTimeoutException.class, () -> {
-                service.timeoutMethod();
-            });
-
-            serverService.deregister(RemoteInterface.class);
->>>>>>> 1dd7a2ebd (fix(cluster): fix slot mismatch causing RedisNodeNotFoundException)
-        });
+        assertThat(logCaptor.getTraceLogs().stream().noneMatch(n -> n.contains("reply: -MOVED"))).isTrue();
+        logCaptor.close();
     }
 }

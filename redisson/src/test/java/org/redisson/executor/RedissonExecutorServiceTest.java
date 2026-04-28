@@ -15,7 +15,9 @@ import org.redisson.api.annotation.RInject;
 import org.redisson.api.executor.TaskFinishedListener;
 import org.redisson.api.executor.TaskStartedListener;
 import org.redisson.api.listener.MessageListener;
+import nl.altindag.log.LogCaptor;
 import org.redisson.client.codec.LongCodec;
+import org.redisson.client.handler.CommandDecoder;
 import org.redisson.config.Config;
 import org.redisson.config.NameMapper;
 import org.redisson.config.RedissonNodeConfig;
@@ -781,6 +783,9 @@ public class RedissonExecutorServiceTest extends RedisDockerTest {
 
     @Test
     public void testExecutorServiceInCluster() throws Exception {
+        LogCaptor logCaptor = LogCaptor.forClass(CommandDecoder.class);
+        logCaptor.setLogLevelToTrace();
+
         withNewCluster((nodes, redisson) -> {
             try {
                 RExecutorService executor = redisson.getExecutorService("test-cluster-executor");
@@ -806,10 +811,16 @@ public class RedissonExecutorServiceTest extends RedisDockerTest {
                 throw new RuntimeException(e);
             }
         });
+
+        assertThat(logCaptor.getTraceLogs().stream().noneMatch(n -> n.contains("reply: -MOVED"))).isTrue();
+        logCaptor.close();
     }
 
     @Test
     public void testScheduledExecutorServiceInCluster() throws Exception {
+        LogCaptor logCaptor = LogCaptor.forClass(CommandDecoder.class);
+        logCaptor.setLogLevelToTrace();
+
         withNewCluster((nodes, redisson) -> {
             try {
                 RScheduledExecutorService executor = redisson.getExecutorService("test-cluster-scheduler");
@@ -832,10 +843,16 @@ public class RedissonExecutorServiceTest extends RedisDockerTest {
                 throw new RuntimeException(e);
             }
         });
+
+        assertThat(logCaptor.getTraceLogs().stream().noneMatch(n -> n.contains("reply: -MOVED"))).isTrue();
+        logCaptor.close();
     }
 
     @Test
     public void testTaskCountInCluster() throws Exception {
+        LogCaptor logCaptor = LogCaptor.forClass(CommandDecoder.class);
+        logCaptor.setLogLevelToTrace();
+
         withNewCluster((nodes, redisson) -> {
             try {
                 RExecutorService executor = redisson.getExecutorService("test-cluster-taskcount");
@@ -860,10 +877,16 @@ public class RedissonExecutorServiceTest extends RedisDockerTest {
                 throw new RuntimeException(e);
             }
         });
+
+        assertThat(logCaptor.getTraceLogs().stream().noneMatch(n -> n.contains("reply: -MOVED"))).isTrue();
+        logCaptor.close();
     }
 
     @Test
     public void testCancelTaskInCluster() throws Exception {
+        LogCaptor logCaptor = LogCaptor.forClass(CommandDecoder.class);
+        logCaptor.setLogLevelToTrace();
+
         withNewCluster((nodes, redisson) -> {
             try {
                 RScheduledExecutorService executor = redisson.getExecutorService("test-cluster-cancel-task");
@@ -882,10 +905,16 @@ public class RedissonExecutorServiceTest extends RedisDockerTest {
                 throw new RuntimeException(e);
             }
         });
+
+        assertThat(logCaptor.getTraceLogs().stream().noneMatch(n -> n.contains("reply: -MOVED"))).isTrue();
+        logCaptor.close();
     }
 
     @Test
     public void testExecutorServiceWithNameMapperInCluster() throws Exception {
+        LogCaptor logCaptor = LogCaptor.forClass(CommandDecoder.class);
+        logCaptor.setLogLevelToTrace();
+
         withNewCluster((nodes, redisson) -> {
             try {
                 Config config = redisson.getConfig();
@@ -925,5 +954,8 @@ public class RedissonExecutorServiceTest extends RedisDockerTest {
                 throw new RuntimeException(e);
             }
         });
+
+        assertThat(logCaptor.getTraceLogs().stream().noneMatch(n -> n.contains("reply: -MOVED"))).isTrue();
+        logCaptor.close();
     }
 }
