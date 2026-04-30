@@ -17,7 +17,9 @@ package org.redisson;
 
 import org.redisson.api.RDeque;
 import org.redisson.api.RFuture;
+import org.redisson.api.ObjectListener;
 import org.redisson.api.RedissonClient;
+import org.redisson.api.listener.DequeAddFirstListener;
 import org.redisson.api.queue.DequeMoveArgs;
 import org.redisson.api.queue.DequeMoveParams;
 import org.redisson.client.codec.Codec;
@@ -46,6 +48,35 @@ public class RedissonDeque<V> extends RedissonQueue<V> implements RDeque<V> {
 
     public RedissonDeque(Codec codec, CommandAsyncExecutor commandExecutor, String name, RedissonClient redisson) {
         super(codec, commandExecutor, name, redisson);
+    }
+
+    @Override
+    public int addListener(ObjectListener listener) {
+        if (listener instanceof DequeAddFirstListener) {
+            return addListener("__keyevent@*:lpush", (DequeAddFirstListener) listener, DequeAddFirstListener::onAddFirst);
+        }
+
+        return super.addListener(listener);
+    }
+
+    @Override
+    public RFuture<Integer> addListenerAsync(ObjectListener listener) {
+        if (listener instanceof DequeAddFirstListener) {
+            return addListenerAsync("__keyevent@*:lpush", (DequeAddFirstListener) listener, DequeAddFirstListener::onAddFirst);
+        }
+
+        return super.addListenerAsync(listener);
+    }
+
+    @Override
+    public void removeListener(int listenerId) {
+        removeListener(listenerId, "__keyevent@*:lpush");
+        super.removeListener(listenerId);
+    }
+
+    @Override
+    public RFuture<Void> removeListenerAsync(int listenerId) {
+        return removeListenerAsync(super.removeListenerAsync(listenerId), listenerId, "__keyevent@*:lpush");
     }
 
     @Override
