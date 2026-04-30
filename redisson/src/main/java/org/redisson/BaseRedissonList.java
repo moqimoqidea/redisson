@@ -864,10 +864,8 @@ public class BaseRedissonList<V> extends RedissonExpirable {
 
     @Override
     public RFuture<Void> removeListenerAsync(int listenerId) {
-        RFuture<Void> f1 = removeTrackingListenerAsync(listenerId);
-        RFuture<Void> f2 = removeListenerAsync(listenerId,
+        return removeListenerAsync(removeTrackingListenerAsync(listenerId), listenerId,
                 "__keyevent@*:rpush", "__keyevent@*:lrem", "__keyevent@*:ltrim", "__keyevent@*:lset", "__keyevent@*:linsert");
-        return new CompletableFutureWrapper<>(CompletableFuture.allOf(f1.toCompletableFuture(), f2.toCompletableFuture()));
     }
 
     public boolean removeIf(Predicate<? super V> filter) {

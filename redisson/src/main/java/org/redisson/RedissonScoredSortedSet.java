@@ -2240,10 +2240,8 @@ public class RedissonScoredSortedSet<V> extends RedissonExpirable implements RSc
 
     @Override
     public RFuture<Void> removeListenerAsync(int listenerId) {
-        RFuture<Void> f1 = removeTrackingListenerAsync(listenerId);
-        RFuture<Void> f2 = removeListenerAsync(listenerId,
+        return removeListenerAsync(removeTrackingListenerAsync(listenerId), listenerId,
                 "__keyevent@*:zadd", "__keyevent@*:zrem");
-        return new CompletableFutureWrapper<>(CompletableFuture.allOf(f1.toCompletableFuture(), f2.toCompletableFuture()));
     }
 
 }

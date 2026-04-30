@@ -395,9 +395,7 @@ public class RedissonBucket<V> extends RedissonExpirable implements RBucket<V> {
 
     @Override
     public RFuture<Void> removeListenerAsync(int listenerId) {
-        RFuture<Void> f1 = removeTrackingListenerAsync(listenerId);
-        RFuture<Void> f2 = removeListenerAsync(listenerId, "__keyevent@*:set");
-        return new CompletableFutureWrapper<>(CompletableFuture.allOf(f1.toCompletableFuture(), f2.toCompletableFuture()));
+        return removeListenerAsync(removeTrackingListenerAsync(listenerId), listenerId, "__keyevent@*:set");
     }
 
     @Override

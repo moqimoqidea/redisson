@@ -1004,11 +1004,9 @@ public class RedissonStream<K, V> extends RedissonExpirable implements RStream<K
 
     @Override
     public RFuture<Void> removeListenerAsync(int listenerId) {
-        RFuture<Void> f1 = removeTrackingListenerAsync(listenerId);
-        RFuture<Void> f2 = removeListenerAsync(listenerId,
+        return removeListenerAsync(removeTrackingListenerAsync(listenerId), listenerId,
                 "__keyevent@*:xadd", "__keyevent@*:xdel", "__keyevent@*:xgroup-createconsumer",
                 "__keyevent@*:xgroup-delconsumer", "__keyevent@*:xgroup-create", "__keyevent@*:xgroup-destroy", "__keyevent@*:xtrim");
-        return new CompletableFutureWrapper<>(CompletableFuture.allOf(f1.toCompletableFuture(), f2.toCompletableFuture()));
     }
 
 

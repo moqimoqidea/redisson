@@ -935,10 +935,8 @@ public class RedissonSet<V> extends RedissonExpirable implements RSet<V>, ScanIt
 
     @Override
     public RFuture<Void> removeListenerAsync(int listenerId) {
-        RFuture<Void> f1 = removeTrackingListenerAsync(listenerId);
-        RFuture<Void> f2 = removeListenerAsync(listenerId,
-                            "__keyevent@*:sadd", "__keyevent@*:srem", "__keyevent@*:spop");
-        return new CompletableFutureWrapper<>(CompletableFuture.allOf(f1.toCompletableFuture(), f2.toCompletableFuture()));
+        return removeListenerAsync(removeTrackingListenerAsync(listenerId), listenerId,
+                "__keyevent@*:sadd", "__keyevent@*:srem", "__keyevent@*:spop");
     }
 
 
