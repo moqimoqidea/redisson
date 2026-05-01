@@ -24,6 +24,9 @@ public class LZ4CodecV2Test extends RedisDockerTest {
         RedissonClient r2 = Redisson.create(config2);
         RBucket<String> s2 = r2.getBucket("test1");
         assertThat(s2.get()).isEqualTo("12324");
+
+        r.shutdown();
+        r2.shutdown();
     }
 
 }

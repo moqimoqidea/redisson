@@ -86,6 +86,7 @@ public class RedisClientTest  {
         b.set("123");
 
         r.shutdown();
+        redisson.shutdown();
     }
 
     @Test

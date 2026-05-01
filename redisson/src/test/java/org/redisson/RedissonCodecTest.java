@@ -49,6 +49,7 @@ public class RedissonCodecTest extends RedisDockerTest {
         UUID value = UUID.randomUUID();
         bucket.set(value);
         assertThat(bucket.get()).isEqualTo(value);
+        redisson.shutdown();
     }
 
     @Test
@@ -61,6 +62,7 @@ public class RedissonCodecTest extends RedisDockerTest {
         UUID value = UUID.randomUUID();
         set.set(value);
         assertThat(set.get()).isEqualTo(value);
+        redisson.shutdown();
     }
 
     @Test
