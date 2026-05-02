@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.redisson.api.RLock;
 import org.redisson.api.RReadWriteLock;
+import org.redisson.api.RedissonClient;
 
 import java.security.SecureRandom;
 import java.time.Duration;
@@ -16,10 +17,15 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import static org.assertj.core.api.Assertions.*;
 import static org.awaitility.Awaitility.await;
 
 public class RedissonReadWriteLockTest extends BaseConcurrentTest {
+
+    private static final Logger log = LoggerFactory.getLogger(RedissonReadWriteLockTest.class);
 
     @Test
     public void testReadLockExpiration() throws Exception{
@@ -755,6 +761,90 @@ public class RedissonReadWriteLockTest extends BaseConcurrentTest {
         });
 
         Assertions.assertEquals(iterations, lockedCounter.get());
+    }
+
+    @Test
+    public void testMultiInstanceReadLockZombieCleanup() throws InterruptedException {
+        // Instance A acquires read lock and then shuts down without unlocking
+        RedissonClient instanceA = createInstance();
+        try {
+            RReadWriteLock rwA = instanceA.getReadWriteLock("zombie_test");
+            rwA.readLock().lock();
+        } finally {
+            instanceA.shutdown();
+        }
+
+        RedissonClient instanceB = createInstance();
+        RReadWriteLock rwB = instanceB.getReadWriteLock("zombie_test");
+        rwB.readLock().lock();
+
+        // Wait longer than lockWatchdogTimeout so that Instance A's timeout keys expire
+        long watchdogTimeout = instanceB.getConfig().getLockWatchdogTimeout();
+        Thread.sleep(watchdogTimeout + 5000);
+
+        rwB.readLock().unlock();
+
+        // Now a write lock should succeed
+        RLock writeLock = rwB.writeLock();
+        boolean acquired = writeLock.tryLock(5, TimeUnit.SECONDS);
+        assertThat(acquired).as("Write lock should succeed after zombie reader cleanup").isTrue();
+        writeLock.unlock();
+
+        instanceB.shutdown();
+    }
+
+    //@Test
+    public void testMultiInstanceZombieReadLockPerformance() throws InterruptedException {
+        int zombieInstances = 20;
+        int locksPerZombie = 3;
+        int totalFields = zombieInstances * locksPerZombie;
+
+        List<RedissonClient> zombies = new ArrayList<>();
+        for (int i = 0; i < zombieInstances; i++) {
+            RedissonClient client = createInstance();
+            RReadWriteLock rw = client.getReadWriteLock("perf_zombie");
+            for (int j = 0; j < locksPerZombie; j++) {
+                rw.readLock().lock();
+            }
+            zombies.add(client);
+        }
+
+        // Kill all zombies without unlocking
+        for (RedissonClient client : zombies) {
+            client.shutdown();
+        }
+
+        // Living instance acquires readLock
+        RedissonClient living = createInstance();
+        RReadWriteLock rw = living.getReadWriteLock("perf_zombie");
+        rw.readLock().lock();
+
+        // Let zombie timeout keys expire naturally
+        long watchdogTimeout = living.getConfig().getLockWatchdogTimeout();
+        Thread.sleep(watchdogTimeout + 5000);
+
+        rw.readLock().unlock();
+
+        // Poll writeLock until success
+        long pollStart = System.currentTimeMillis();
+        boolean acquired = false;
+        int attempts = 0;
+        while (!acquired) {
+            attempts++;
+            acquired = rw.writeLock().tryLock(1, TimeUnit.SECONDS);
+        }
+        long pollMs = System.currentTimeMillis() - pollStart;
+
+        rw.writeLock().unlock();
+        living.shutdown();
+
+        log.info("ZombieReadLockPerformance: totalFields={}, attempts={}, pollMs={}, acquired={}",
+                 totalFields, attempts, pollMs, acquired);
+
+        assertThat(acquired).as("Write lock must eventually succeed").isTrue();
+
+        log.info("ZombieReadLockPerformance: pollMs={}ms, threshold={}ms, fixed={}",
+                 pollMs, 2000, pollMs < 2000);
     }
 
 }

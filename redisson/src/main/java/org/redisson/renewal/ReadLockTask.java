@@ -42,7 +42,7 @@ public class ReadLockTask extends LockTask {
     }
 
     private ChunkExecution<List<Object>> buildChunk(Iterator<String> iter, int chunkSize) {
-        Map<String, Long> name2lockName = new HashMap<>();
+        Map<String, List<Long>> name2threadIds = new HashMap<>();
         List<Object> args = new ArrayList<>();
         args.add(internalLockLeaseTime);
 
@@ -64,17 +64,20 @@ public class ReadLockTask extends LockTask {
             }
 
             String keyPrefix = entry.getKeyPrefix(threadId);
-            String lockName = entry.getLockName(threadId);
-
-            if (keyPrefix == null || lockName == null) {
+            if (keyPrefix == null) {
                 continue;
             }
 
             keys.add(key);
             keysArgs.add(key);
             keysArgs.add(keyPrefix);
-            args.add(lockName);
-            name2lockName.put(key, threadId);
+
+            List<String> lockNames = new ArrayList<>(entry.threadId2lockName.values());
+            args.add(lockNames.size());
+            args.addAll(lockNames);
+
+            List<Long> threadIds = new ArrayList<>(entry.threadId2lockName.keySet());
+            name2threadIds.put(key, threadIds);
         }
 
         // No valid entries found - signal completion
@@ -87,24 +90,23 @@ public class ReadLockTask extends LockTask {
         CompletionStage<List<Object>> f = executor.syncedEval(firstName, LongCodec.INSTANCE,
                 new RedisCommand<>("EVAL", new ContainsDecoder<>(keys)),
           "local result = {} " +
-                "local j = 1 " +
+                "local argIdx = 2 " +
                 "for i = 1, #KEYS, 2 do " +
-                    "j = j + 1; " +
-                    "local counter = redis.call('hget', KEYS[i], ARGV[j]); " +
-                    "if (counter ~= false) then " +
-                        "redis.call('pexpire', KEYS[i], ARGV[1]); " +
-
-                        "if (redis.call('hlen', KEYS[i]) > 1) then " +
-                            "local keys = redis.call('hkeys', KEYS[i]); " +
-                            "for n, key in ipairs(keys) do " +
-                                "counter = tonumber(redis.call('hget', KEYS[i], key)); " +
-                                "if type(counter) == 'number' then " +
-                                    "for c=counter, 1, -1 do " +
-                                        "redis.call('pexpire', KEYS[i+1] .. ':' .. key .. ':rwlock_timeout:' .. c, ARGV[1]); " +
-                                    "end; " +
-                                "end; " +
+                    "local anyAlive = false; " +
+                    "local lockNamesCount = tonumber(ARGV[argIdx]); " +
+                    "argIdx = argIdx + 1; " +
+                    "for k = 1, lockNamesCount do " +
+                        "local counter = redis.call('hget', KEYS[i], ARGV[argIdx]); " +
+                        "if (counter ~= false) then " +
+                            "anyAlive = true; " +
+                            "for c=counter, 1, -1 do " +
+                                "redis.call('pexpire', KEYS[i+1] .. ':' .. ARGV[argIdx] .. ':rwlock_timeout:' .. c, ARGV[1]); " +
                             "end; " +
                         "end; " +
+                        "argIdx = argIdx + 1; " +
+                    "end; " +
+                    "if (anyAlive) then " +
+                        "redis.call('pexpire', KEYS[i], ARGV[1]); " +
                         "table.insert(result, 1); " +
                     "else " +
                         "table.insert(result, 0); " +
@@ -118,7 +120,12 @@ public class ReadLockTask extends LockTask {
             keys.removeAll(existingNames);
             for (Object k : keys) {
                 String key = k.toString();
-                cancelExpirationRenewal(key, name2lockName.get(key));
+                List<Long> threadIds = name2threadIds.get(key);
+                if (threadIds != null) {
+                    for (Long threadId : threadIds) {
+                        cancelExpirationRenewal(key, threadId);
+                    }
+                }
             }
         });
     }
