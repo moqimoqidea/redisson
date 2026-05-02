@@ -80,11 +80,10 @@ public class EntraIdCredentialsTest extends RedisDockerTest {
         listenerRef.get().onTokenRenewed(new SimpleToken("default", "1234",
                 System.currentTimeMillis() + 60_000, 0, new HashMap<>()));
 
-        Config config = new Config();
+        Config config = createConfig();
         config.setProtocol(Protocol.RESP2);
         config.setCredentialsResolver(resolver);
         config.useSingleServer()
-                .setAddress("redis://127.0.0.1:" + redis.getFirstMappedPort())
                 .setSubscriptionConnectionMinimumIdleSize(1)
                 .setSubscriptionConnectionPoolSize(1);
 

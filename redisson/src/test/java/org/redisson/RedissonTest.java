@@ -900,7 +900,7 @@ public class RedissonTest extends RedisDockerTest {
 
         Config c = Config.fromYAML(t);
 
-        assertThat(t).contains("slaveLoadingFallbackToMaster: false");
+        assertThat(t).contains("fallbackLoadingToMaster: false");
         assertThat(c.toYAML()).isEqualTo(t);
     }
 

@@ -1671,7 +1671,7 @@ public class RedissonMapCacheTest extends BaseMapTest {
 
     @Test
     public void testNameMapper() throws InterruptedException, ExecutionException {
-        Config config = new Config();
+        Config config = createConfig();
         config.useSingleServer()
                 .setNameMapper(new NameMapper() {
                     @Override
@@ -1685,8 +1685,7 @@ public class RedissonMapCacheTest extends BaseMapTest {
                     }
                 })
                 .setConnectionMinimumIdleSize(3)
-                .setConnectionPoolSize(3)
-                .setAddress(redisson.getConfig().useSingleServer().getAddress());
+                .setConnectionPoolSize(3);
 
         RedissonClient redisson = Redisson.create(config);
 
