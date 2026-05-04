@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.redisson.api.RMap;
 import org.redisson.api.RMapCacheNative;
+import org.redisson.api.listener.MapClearExpireListener;
 import org.redisson.api.listener.MapExpiredListener;
 import org.redisson.api.listener.MapRemoveListener;
 import org.redisson.api.map.PutArgs;
@@ -766,6 +767,29 @@ public class RedissonMapCacheNativeTest extends BaseMapTest {
             });
             map.put("1", "2", Duration.ofSeconds(1));
             map.put("3", "4", Instant.now().plusSeconds(2));
+
+            Awaitility.await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> assertThat(executedCount.get()).isGreaterThanOrEqualTo(2));
+
+            redisson.shutdown();
+        }, NOTIFY_KEYSPACE_EVENTS, "Eh");
+    }
+
+    @Test
+    public void testClearExpireListener() {
+        testWithParams(redisson -> {
+            AtomicInteger executedCount = new AtomicInteger();
+            RMapCacheNative<String, String> map = redisson.getMapCacheNative("simple");
+            map.addListener(new MapClearExpireListener() {
+                @Override
+                public void onClearExpire(String name) {
+                    executedCount.incrementAndGet();
+                }
+            });
+            map.put("1", "2", Duration.ofSeconds(60));
+            map.put("3", "4", Duration.ofSeconds(60));
+
+            map.clearExpire("1");
+            map.clearExpire(new HashSet<>(Arrays.asList("3")));
 
             Awaitility.await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> assertThat(executedCount.get()).isGreaterThanOrEqualTo(2));
 

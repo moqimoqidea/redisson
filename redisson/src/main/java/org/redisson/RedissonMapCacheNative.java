@@ -17,6 +17,7 @@ package org.redisson;
 
 import java.time.Instant;
 import org.redisson.api.*;
+import org.redisson.api.listener.MapClearExpireListener;
 import org.redisson.api.listener.MapExpiredListener;
 import org.redisson.api.map.PutArgs;
 import org.redisson.api.map.PutParams;
@@ -666,6 +667,9 @@ public class RedissonMapCacheNative<K, V> extends RedissonMap<K, V> implements R
         if (listener instanceof MapExpiredListener) {
             return addListener("__keyevent@*:hexpired", (MapExpiredListener) listener, MapExpiredListener::onExpired);
         }
+        if (listener instanceof MapClearExpireListener) {
+            return addListener("__keyevent@*:hpersist", (MapClearExpireListener) listener, MapClearExpireListener::onClearExpire);
+        }
 
         return super.addListener(listener);
     }
@@ -675,19 +679,22 @@ public class RedissonMapCacheNative<K, V> extends RedissonMap<K, V> implements R
         if (listener instanceof MapExpiredListener) {
             return addListenerAsync("__keyevent@*:hexpired", (MapExpiredListener) listener, MapExpiredListener::onExpired);
         }
+        if (listener instanceof MapClearExpireListener) {
+            return addListenerAsync("__keyevent@*:hpersist", (MapClearExpireListener) listener, MapClearExpireListener::onClearExpire);
+        }
 
         return super.addListenerAsync(listener);
     }
 
     @Override
     public void removeListener(int listenerId) {
-        removeListener(listenerId, "__keyevent@*:hexpired");
+        removeListener(listenerId, "__keyevent@*:hexpired", "__keyevent@*:hpersist");
         super.removeListener(listenerId);
     }
 
     @Override
     public RFuture<Void> removeListenerAsync(int listenerId) {
-        return removeListenerAsync(super.removeListenerAsync(listenerId), listenerId, "__keyevent@*:hexpired");
+        return removeListenerAsync(super.removeListenerAsync(listenerId), listenerId, "__keyevent@*:hexpired", "__keyevent@*:hpersist");
     }
 
     @Override
