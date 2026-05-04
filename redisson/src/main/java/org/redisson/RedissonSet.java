@@ -17,6 +17,7 @@ package org.redisson;
 
 import org.redisson.api.*;
 import org.redisson.api.listener.SetAddListener;
+import org.redisson.api.listener.SetDiffStoreListener;
 import org.redisson.api.listener.SetInterStoreListener;
 import org.redisson.api.listener.SetRemoveListener;
 import org.redisson.api.listener.SetRemoveRandomListener;
@@ -908,6 +909,9 @@ public class RedissonSet<V> extends RedissonExpirable implements RSet<V>, ScanIt
         if (listener instanceof SetUnionStoreListener) {
             return addListener("__keyevent@*:sunionstore", (SetUnionStoreListener) listener, SetUnionStoreListener::onStore);
         }
+        if (listener instanceof SetDiffStoreListener) {
+            return addListener("__keyevent@*:sdiffstore", (SetDiffStoreListener) listener, SetDiffStoreListener::onStore);
+        }
         if (listener instanceof TrackingListener) {
             return addTrackingListener((TrackingListener) listener);
         }
@@ -932,6 +936,9 @@ public class RedissonSet<V> extends RedissonExpirable implements RSet<V>, ScanIt
         if (listener instanceof SetUnionStoreListener) {
             return addListenerAsync("__keyevent@*:sunionstore", (SetUnionStoreListener) listener, SetUnionStoreListener::onStore);
         }
+        if (listener instanceof SetDiffStoreListener) {
+            return addListenerAsync("__keyevent@*:sdiffstore", (SetDiffStoreListener) listener, SetDiffStoreListener::onStore);
+        }
         if (listener instanceof TrackingListener) {
             return addTrackingListenerAsync((TrackingListener) listener);
         }
@@ -942,14 +949,14 @@ public class RedissonSet<V> extends RedissonExpirable implements RSet<V>, ScanIt
     @Override
     public void removeListener(int listenerId) {
         removeTrackingListener(listenerId);
-        removeListener(listenerId, "__keyevent@*:sadd", "__keyevent@*:srem", "__keyevent@*:spop", "__keyevent@*:sinterstore", "__keyevent@*:sunionstore");
+        removeListener(listenerId, "__keyevent@*:sadd", "__keyevent@*:srem", "__keyevent@*:spop", "__keyevent@*:sinterstore", "__keyevent@*:sunionstore", "__keyevent@*:sdiffstore");
         super.removeListener(listenerId);
     }
 
     @Override
     public RFuture<Void> removeListenerAsync(int listenerId) {
         return removeListenerAsync(removeTrackingListenerAsync(listenerId), listenerId,
-                "__keyevent@*:sadd", "__keyevent@*:srem", "__keyevent@*:spop", "__keyevent@*:sinterstore", "__keyevent@*:sunionstore");
+                "__keyevent@*:sadd", "__keyevent@*:srem", "__keyevent@*:spop", "__keyevent@*:sinterstore", "__keyevent@*:sunionstore", "__keyevent@*:sdiffstore");
     }
 
 
